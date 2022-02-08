@@ -1,0 +1,23 @@
+repositories:
+  - name: traefik
+    url: https://helm.traefik.io/traefik
+releases:
+  - name: traefik-external
+    namespace: traefik-external
+    createNamespace: true
+    chart: traefik/traefik
+    version: '*'
+    values:
+      - values/traefik/values_external.yaml
+
+#  - name: traefik-internal
+#    namespace: traefik-internal
+#    createNamespace: true
+#    chart: traefik/traefik
+#    version: '*'
+#    values:
+#      - values/traefik/values_internal.yaml
+#      - additionalArguments:
+#          - "--providers.kubernetesingress.ingressclass=traefik-internal"
+
+

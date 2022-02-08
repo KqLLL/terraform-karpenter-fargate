@@ -1,0 +1,102 @@
+# Default values for Traefik
+# Ref https://github.com/traefik/traefik-helm-chart/blob/master/traefik/values.yaml
+
+# Configure the deployment
+deployment:
+  # Number of pods of the deployment (only applies when kind == Deployment)
+  replicas: 1
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+#
+# Configure providers
+#
+providers:
+  kubernetesIngress:
+    # IP used for Kubernetes Ingress endpoints
+    # Code Ref: https://github.com/traefik/traefik/blob/v2.5.3/pkg/provider/kubernetes/ingress/kubernetes.go#L342
+    publishedService:
+      enabled: true
+
+# Use ingressClass. Ignored if Traefik version < 2.3 / kubernetes < 1.18.x
+ingressClass:
+  enabled: true
+  isDefaultClass: true
+  fallbackApiVersion: "v1"
+
+additionalArguments:
+## limit ingressclass scope
+- "--providers.kubernetesingress.ingressclass=traefik-external"
+
+# Create an IngressRoute for the dashboard
+ingressRoute:
+  dashboard:
+    enabled: true
+
+# Logs
+# https://docs.traefik.io/observability/logs/
+logs:
+  access:
+    # To enable access logs
+    enabled: true
+
+globalArguments:
+  #- "--global.checknewversion"
+  #- "--global.sendanonymoususage"
+  - "--entryPoints.web.proxyProtocol.trustedIPs=10.0.0.0/12"
+  - "--entryPoints.websecure.proxyProtocol.trustedIPs=10.0.0.0/12"
+
+tlsOptions:
+  default:
+    minVersion: VersionTLS12
+    # See: https://ssl-config.mozilla.org/#server=traefik&version=2.4&config=intermediate&guideline=5.6
+    cipherSuites:
+      - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+      - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+      - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+      - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+      - TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305
+      - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305
+  modern:
+    minVersion: VersionTLS13
+
+# Options for the main traefik service, where the entrypoints traffic comes
+# from.
+service:
+  enabled: true
+  type: LoadBalancer
+  # Additional annotations (e.g. for cloud provider specific config)
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-proxy-protocol: '*'
+
+## Create HorizontalPodAutoscaler object.
+##
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        targetAverageUtilization: 80
+    - type: Resource
+      resource:
+        name: memory
+        targetAverageUtilization: 80
+
+# resources:
+#   requests:
+#     cpu: "500m"
+#     memory: "1024Mi"
+
+# Configure ports
+#ports:
+#  web:
+#    # Port Redirections
+#    # Added in 2.2, you can make permanent redirects via entrypoints.
+#    # https://docs.traefik.io/routing/entrypoints/#redirection
+#    redirectTo: websecure

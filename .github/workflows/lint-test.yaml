@@ -1,0 +1,22 @@
+name: Lint and Test TF
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  tf-fmt:
+    runs-on: hashicorp/terraform:latest
+    steps:
+      - name: tf fmt
+        run: terraform fmt -check=true -diff=true -recursive .
+  lint-tf:
+    runs-on: ghcr.io/terraform-linters/tflint:latest
+    steps:
+      - name: lint
+        run: |
+          ls -d workspaces/* | xargs -I _ sh -c 'echo "Running in _"; cd _; tflint --init; tflint'
+          ls -d modules/* | xargs -I _ sh -c 'echo "Running in _"; cd _; tflint --init; tflint'
+
+
