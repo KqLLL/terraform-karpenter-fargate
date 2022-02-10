@@ -10,8 +10,16 @@ provider "aws" {
   secret_key = var.secret_key
 }
 
+data "aws_eks_cluster" "eks_cluster" {
+  name = local.cluster_name
+
+  depends_on = [module.eks.eks_fargate_profiles]
+}
+
 data "aws_eks_cluster_auth" "eks_auth" {
   name = module.eks.cluster_id
+
+  depends_on = [module.eks.eks_fargate_profiles]
 }
 
 provider "helm" {
@@ -20,6 +28,34 @@ provider "helm" {
     cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
     token                  = data.aws_eks_cluster_auth.eks_auth.token
   }
+}
+
+locals {
+  kubeconfig = yamlencode({
+    apiVersion      = "v1"
+    kind            = "Config"
+    current-context = "terraform"
+    clusters = [{
+      name = data.aws_eks_cluster.eks_cluster.id
+      cluster = {
+        certificate-authority-data = data.aws_eks_cluster.eks_cluster.certificate_authority[0].data
+        server                     = data.aws_eks_cluster.eks_cluster.endpoint
+      }
+    }]
+    contexts = [{
+      name = "terraform"
+      context = {
+        cluster = data.aws_eks_cluster.eks_cluster.id
+        user    = "terraform"
+      }
+    }]
+    users = [{
+      name = "terraform"
+      user = {
+        token = data.aws_eks_cluster_auth.eks_auth.token
+      }
+    }]
+  })
 }
 
 # EKS Fargate Module
@@ -34,6 +70,23 @@ module "eks" {
   karpenter_iam_instance_profile = local.karpenter_iam_instance_profile_name
 
   environment = local.environment
+}
+
+resource "null_resource" "patch_coredns" {
+  triggers = {
+    kubeconfig = base64encode(local.kubeconfig)
+    cmd_patch = "kubectl patch deployment coredns -n kube-system --type json -p='[{\"op\": \"remove\", \"path\": \"/spec/template/metadata/annotations/eks.amazonaws.com~1compute-type\"}]' --kubeconfig <(echo $KUBECONFIG | base64 --decode)"
+  }
+
+  provisioner "local-exec" {
+    interpreter = ["/bin/bash", "-c"]
+    environment = {
+      KUBECONFIG = self.triggers.kubeconfig
+    }
+    command = self.triggers.cmd_patch
+  }
+
+  depends_on = [module.eks.eks_fargate_profiles]
 }
 
 ## helm release
