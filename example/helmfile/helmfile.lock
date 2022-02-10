@@ -1,7 +1,13 @@
 version: v0.143.0
 dependencies:
+- name: amazon-ec2-metadata-mock
+  repository: https://aws.github.io/eks-charts
+  version: 1.10.1
+- name: aws-node-termination-handler
+  repository: https://aws.github.io/eks-charts
+  version: 0.16.1
 - name: traefik
   repository: https://helm.traefik.io/traefik
-  version: 10.14.0
-digest: sha256:18882ef244516e743e25e77e0173f9d7174f509f6b109e24ec9394c8cd56d0b0
-generated: "2022-02-08T11:52:35.81628+08:00"
+  version: 10.14.1
+digest: sha256:586391f5493e8e1800601dd61fe1f935fb7c52780e635f0ef1b18ec9a00c2b97
+generated: "2022-02-10T14:18:23.100648+08:00"

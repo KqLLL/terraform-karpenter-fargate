@@ -1,0 +1,23 @@
+## AWS Node Termination Handler - IMDS Processor
+## Ref: https://github.com/aws/aws-node-termination-handler/blob/v1.14.1/config/helm/aws-node-termination-handler/values.yaml
+
+# webhookURL if specified, posts event data to URL upon instance interruption action.
+webhookURL: ""
+
+# enableSpotInterruptionDraining If false, do not drain nodes when the spot interruption termination notice is received
+enableSpotInterruptionDraining: true
+
+# enableScheduledEventDraining [EXPERIMENTAL] If true, drain nodes before the maintenance window starts for an EC2 instance scheduled event
+enableScheduledEventDraining: false
+
+# enableRebalanceMonitoring If true, cordon nodes when the rebalance recommendation notice is received
+enableRebalanceMonitoring: false
+
+# enableRebalanceDraining If true, drain nodes when the rebalance recommendation notice is received
+enableRebalanceDraining: false
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Testing
+# ---------------------------------------------------------------------------------------------------------------------
+# (TESTING USE): Override the default metadata URL (default: http://169.254.169.254:80)
+instanceMetadataURL: "http://amazon-ec2-metadata-mock-service.default.svc.cluster.local:1338"

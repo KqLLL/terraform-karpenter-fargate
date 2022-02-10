@@ -8,7 +8,7 @@ deployment:
 
 # Pod disruption budget
 podDisruptionBudget:
-  enabled: true
+  enabled: false
   minAvailable: 1
 
 #

@@ -1,7 +1,25 @@
 repositories:
   - name: traefik
     url: https://helm.traefik.io/traefik
+  - name: eks
+    url: https://aws.github.io/eks-charts
+
 releases:
+  - name: aws-node-termination-handler
+    namespace: kube-system
+    chart: eks/aws-node-termination-handler
+    version: '*'
+    values:
+      - values/aws-node-termination-handler/values.yaml
+
+  - name: aws-ec2-metadata-mock
+    namespace: default
+    chart: eks/amazon-ec2-metadata-mock
+    version: '*'
+    values:
+      - values/aws-ec2-metadata-mock/values.yaml
+
+
   - name: traefik-external
     namespace: traefik-external
     createNamespace: true
