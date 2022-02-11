@@ -75,7 +75,7 @@ module "eks" {
 resource "null_resource" "patch_coredns" {
   triggers = {
     kubeconfig = base64encode(local.kubeconfig)
-    cmd_patch = "kubectl patch deployment coredns -n kube-system --type json -p='[{\"op\": \"remove\", \"path\": \"/spec/template/metadata/annotations/eks.amazonaws.com~1compute-type\"}]' --kubeconfig <(echo $KUBECONFIG | base64 --decode)"
+    cmd_patch = "kubectl patch deployment coredns -n kube-system --type json -p='[{\"op\": \"remove\", \"path\": \"/spec/template/metadata/annotations/eks.amazonaws.com~1compute-type\"}]' --kubeconfig <(echo $KUBECONFIG | base64 --decode) | true"
   }
 
   provisioner "local-exec" {
