@@ -29,58 +29,40 @@ module "eks" {
     }
   }
 
-  # Extend cluster security group rules
-  cluster_security_group_additional_rules = {
-#    ingress_coredns_ports_tcp = {
-#      description                = "CoreDNS ingress port by tcp"
-#      protocol                   = "tcp"
-#      from_port                  = 53
-#      to_port                    = 53
-#      type                       = "ingress"
-#      source_node_security_group = true
-#    }
-#    ingress_coredns_ports_udp = {
-#      description                = "CoreDNS ingress port by udp"
-#      protocol                   = "tcp"
-#      from_port                  = 53
-#      to_port                    = 53
-#      type                       = "ingress"
-#      source_node_security_group = true
-#    }
-    egress_nodes_ephemeral_ports_tcp = {
-      description                = "To node 1025-65535"
-      protocol                   = "tcp"
-      from_port                  = 1025
-      to_port                    = 65535
-      type                       = "egress"
-      source_node_security_group = true
-    }
-  }
-
   # Extend node security group rules
   node_security_group_additional_rules = {
-    ingress_self_all = {
-      description = "Node to node all ports/protocols"
-      protocol    = "-1"
+    cluster_to_node_other_ports = {
+      description                   = "Cluster API to node by other ports"
+      protocol                      = "tcp"
+      from_port                     = 1025
+      to_port                       = 65535
+      type                          = "ingress"
+      source_cluster_security_group = true
+    }
+
+    node_egress = {
+      description = "Egress Freedom"
+      cidr_blocks = ["0.0.0.0/0"]
+      protocol    = "all"
       from_port   = 0
-      to_port     = 0
+      to_port     = 65535
+      type        = "egress"
+    }
+
+    node_to_node_ingress = {
+      description = "Node to Node Ingress"
+      protocol    = "all"
+      from_port   = 0
+      to_port     = 65535
       type        = "ingress"
       self        = true
-    },
-    egress_all = {
-      description = "Node all egress"
-      protocol    = "-1"
-      from_port   = 0
-      to_port     = 0
-      type        = "egress"
-      cidr_blocks = ["0.0.0.0/0"]
     }
   }
 
   eks_managed_node_group_defaults = {
     ami_type = "AL2_x86_64"
 
-    create_security_group          = false
+    create_security_group = false
 
     update_launch_template_default_version = true
     instance_types                         = local.instance_types
@@ -152,58 +134,39 @@ module "eks" {
   }
 
   tags = {
-    Cluster = var.cluster_name
+    # Tag node group resources for Karpenter auto-discovery
+    # NOTE - if creating multiple security groups with this module, only tag the
+    # security group that Karpenter should utilize with the following tag
+    "karpenter.sh/discovery" = var.cluster_name
   }
-}
-## Get EKS cluster security group
-data "aws_security_groups" "eks_cluster_sg" {
-  tags = {
-    "aws:eks:cluster-name" = var.cluster_name
-    "kubernetes.io/cluster/sandbox" = "owned"
-  }
-
-  filter {
-    name   = "vpc-id"
-    values = [module.vpc.vpc_id]
-  }
-
-  depends_on = [module.eks]
 }
 
 ## DNS security group rule add to cluster-sg
-resource "aws_security_group_rule" "ingress_coredns_tcp" {
-  type              = "ingress"
-  from_port         = 53
-  to_port           = 53
-  protocol          = "tcp"
-  security_group_id = data.aws_security_groups.eks_cluster_sg.ids[0]
+# Fargate profiles automatically use the cluster primary security group which is created by the EKS service.
+resource "aws_security_group_rule" "primary_cluster_sg_to_node" {
+  type                     = "ingress"
+  from_port                = 0
+  to_port                  = 65535
+  protocol                 = "all"
+  security_group_id        = module.eks.node_security_group_id
+  source_security_group_id = module.eks.cluster_primary_security_group_id
+}
+
+resource "aws_security_group_rule" "fargate_ingress_coredns_tcp" {
+  type                     = "ingress"
+  from_port                = 53
+  to_port                  = 53
+  protocol                 = "tcp"
+  security_group_id        = module.eks.cluster_primary_security_group_id
   source_security_group_id = module.eks.node_security_group_id
 }
 
-resource "aws_security_group_rule" "egress_coredns_tcp" {
-  type              = "egress"
-  from_port         = 53
-  to_port           = 53
-  protocol          = "tcp"
-  security_group_id = data.aws_security_groups.eks_cluster_sg.ids[0]
-  source_security_group_id = module.eks.node_security_group_id
-}
-
-resource "aws_security_group_rule" "ingress_coredns_udp" {
-  type              = "ingress"
-  from_port         = 53
-  to_port           = 53
-  protocol          = "udp"
-  security_group_id = data.aws_security_groups.eks_cluster_sg.ids[0]
-  source_security_group_id = module.eks.node_security_group_id
-}
-
-resource "aws_security_group_rule" "egress_coredns_udp" {
-  type              = "egress"
-  from_port         = 53
-  to_port           = 53
-  protocol          = "udp"
-  security_group_id = data.aws_security_groups.eks_cluster_sg.ids[0]
+resource "aws_security_group_rule" "fargate_ingress_coredns_udp" {
+  type                     = "ingress"
+  from_port                = 53
+  to_port                  = 53
+  protocol                 = "udp"
+  security_group_id        = module.eks.cluster_primary_security_group_id
   source_security_group_id = module.eks.node_security_group_id
 }
 
@@ -244,19 +207,8 @@ module "vpc" {
   tags = local.tags
 }
 
-
 ###Karpenter worker node role ########################
-data "aws_iam_policy" "ssm_managed_instance" {
-  arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
-}
-
-resource "aws_iam_role_policy_attachment" "karpenter_ssm_policy" {
-  role       = module.eks.eks_managed_node_groups["karpenter"].iam_role_name
-  policy_arn = data.aws_iam_policy.ssm_managed_instance.arn
-}
-
 resource "aws_iam_instance_profile" "karpenter" {
   name = var.karpenter_iam_instance_profile
-  #role = aws_iam_role.worker_role.name
   role = module.eks.eks_managed_node_groups["karpenter"].iam_role_name
 }
